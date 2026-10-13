@@ -1,0 +1,1424 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘 점심 뭐 먹지? (날씨 반영)</title>
+
+    <!-- Noto Sans KR 글꼴 (jsdelivr CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5/400.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5/700.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-kr@5/900.css">
+
+    <style>
+        /* ==========================================
+           기본 색상 및 공통 스타일
+           ========================================== */
+        :root {
+            --navy: #1f3a6d;        /* 포인트 남색 */
+            --navy-dark: #152a52;   /* 눌렀을 때 진한 남색 */
+            --navy-soft: #eef2f9;   /* 연한 남색 배경 */
+            --navy-line: #d5deec;   /* 남색 계열 테두리 */
+            --line: #e5e9f0;        /* 일반 테두리 */
+            --text: #1e293b;        /* 본문 글자색 */
+            --muted: #6b7686;       /* 보조 글자색 */
+            --hot: #c2410c;         /* 따뜻한 메뉴 강조 */
+            --hot-bg: #fff1e8;
+            --cold: #1d6fb8;        /* 시원한 메뉴 강조 */
+            --cold-bg: #e9f3fc;
+            --good: #1f7a55;        /* 보통 날씨 안내색 */
+            --danger: #c0392b;      /* 오류/삭제 */
+            --radius: 18px;         /* 카드 모서리 */
+            --shadow: 0 4px 18px rgba(31, 58, 109, 0.08);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body { margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: #ffffff;
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        button, input, select { font-family: inherit; }
+        button { cursor: pointer; }
+        button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: 0.5; }
+
+        .wrap {
+            width: 100%;
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+
+        /* 스크롤바 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f3f5f9; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c9d2e0; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9aa8bf; }
+
+        /* ==========================================
+           상단: 돌아가기 링크
+           ========================================== */
+        .topbar { padding-top: 14px; }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--navy);
+            text-decoration: none;
+            padding: 6px 12px;
+            border-radius: 999px;
+            transition: background 0.2s;
+        }
+        .back-link:hover { background: var(--navy-soft); }
+
+        /* ==========================================
+           헤더: 제목 + 날씨 카드
+           ========================================== */
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding-top: 12px;
+            padding-bottom: 24px;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 900;
+            color: var(--navy);
+            letter-spacing: -0.5px;
+        }
+        .title p {
+            margin: 4px 0 0;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .weather-card {
+            flex: 1 1 360px;
+            max-width: 480px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: #fff;
+            border: 1px solid var(--navy-line);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .weather-info { flex: 1; min-width: 0; }
+
+        .weather-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .region-select {
+            background: var(--navy-soft);
+            border: 1px solid var(--navy-line);
+            color: var(--navy);
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 10px;
+            padding: 5px 8px;
+            outline: none;
+        }
+        .region-select:focus { box-shadow: 0 0 0 3px rgba(31, 58, 109, 0.18); }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            font-size: 16px;
+            padding: 6px;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        .icon-btn:hover:not(:disabled) { background: var(--navy-soft); }
+
+        .weather-display {
+            min-height: 34px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .weather-emoji { font-size: 26px; line-height: 1; }
+        .weather-main { font-size: 15px; font-weight: 900; color: var(--text); }
+        .weather-sub { font-size: 12px; font-weight: 700; color: var(--muted); margin-left: 4px; }
+        .weather-time { display: block; font-size: 11px; color: #9aa4b2; }
+        .weather-loading { font-size: 14px; font-weight: 700; color: var(--muted); }
+        .weather-error { font-size: 14px; font-weight: 700; color: var(--danger); }
+
+        /* 확률 규칙 한줄 요약 */
+        .rule-desc {
+            margin: 4px 0 0;
+            min-height: 18px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--navy);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .rule-desc.muted { color: #9aa4b2; font-weight: 400; }
+        .rule-desc.good { color: var(--good); }
+
+        /* 로딩 스피너 */
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 3px solid #e6eaf1;
+            border-top-color: var(--navy);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            flex-shrink: 0;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 날씨 반영 토글 */
+        .toggle-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            padding-left: 14px;
+            border-left: 1px solid var(--line);
+        }
+        .toggle-box span {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            inset: 0;
+            background: #cfd6e2;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.25s;
+        }
+        .slider::before {
+            content: "";
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.25s;
+        }
+        .switch input:checked + .slider { background: var(--navy); }
+        .switch input:checked + .slider::before { transform: translateX(20px); }
+        .switch input:focus-visible + .slider { box-shadow: 0 0 0 3px rgba(31, 58, 109, 0.25); }
+        .switch input:disabled + .slider { opacity: 0.5; cursor: not-allowed; }
+
+        /* ==========================================
+           메인: 메뉴 패널 + 룰렛
+           ========================================== */
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 28px;
+            padding-bottom: 40px;
+            align-items: start;
+        }
+        @media (min-width: 860px) {
+            .main { grid-template-columns: 340px 1fr; }
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 22px;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 14px;
+        }
+        .panel-head h2 { margin: 0; font-size: 21px; font-weight: 900; color: var(--navy); }
+
+        .badge {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--navy);
+            background: var(--navy-soft);
+            padding: 4px 12px;
+            border-radius: 999px;
+        }
+
+        /* 음식 종류 선택 (세그먼트 버튼) */
+        .segment {
+            display: flex;
+            gap: 4px;
+            background: #f3f5f9;
+            padding: 4px;
+            border-radius: 12px;
+            margin-bottom: 8px;
+        }
+        .segment label { flex: 1; text-align: center; cursor: pointer; }
+        .segment input { display: none; }
+        .segment .seg-item {
+            padding: 6px 0;
+            border-radius: 9px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #98a2b3;
+            transition: all 0.2s;
+        }
+        .segment input:checked + .seg-item { background: #fff; color: var(--navy); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .segment input[value="hot"]:checked + .seg-item { background: var(--hot-bg); color: var(--hot); }
+        .segment input[value="cold"]:checked + .seg-item { background: var(--cold-bg); color: var(--cold); }
+
+        /* 메뉴 입력 */
+        .input-row { display: flex; gap: 8px; }
+        .menu-input {
+            flex: 1;
+            min-width: 0;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            outline: none;
+        }
+        .menu-input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(31, 58, 109, 0.15); background: #fff; }
+
+        .btn-primary {
+            background: var(--navy);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 700;
+            white-space: nowrap;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn-primary:hover:not(:disabled) { background: var(--navy-dark); }
+        .btn-primary:active:not(:disabled) { transform: scale(0.97); }
+
+        .input-msg {
+            min-height: 18px;
+            margin: 6px 2px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--danger);
+        }
+
+        /* 메뉴 목록 */
+        .menu-list {
+            list-style: none;
+            margin: 0 0 14px;
+            padding: 0 4px 0 0;
+            max-height: 250px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        @media (min-width: 860px) { .menu-list { max-height: 350px; } }
+
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 8px 8px 8px 12px;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+        .menu-item:hover { border-color: var(--navy-line); }
+        .menu-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            min-width: 0;
+        }
+        .menu-name .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .menu-name .ico { font-size: 17px; flex-shrink: 0; }
+        .menu-empty { text-align: center; color: #9aa4b2; font-size: 13px; font-weight: 700; padding: 16px 0; }
+
+        .btn-del {
+            background: none;
+            border: none;
+            color: #b4bcc8;
+            font-size: 15px;
+            font-weight: 900;
+            padding: 6px 10px;
+            border-radius: 8px;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .btn-del:hover { color: var(--danger); background: #fdeeee; }
+
+        .btn-ghost {
+            width: 100%;
+            padding: 12px;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.2s;
+        }
+        .btn-ghost:hover:not(:disabled) { color: var(--danger); border-color: #f2c9c4; background: #fff7f6; }
+
+        /* 룰렛 영역 */
+        .roulette-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 18px;
+        }
+        .roulette-box {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1;
+            filter: drop-shadow(0 12px 20px rgba(31, 58, 109, 0.15));
+        }
+        /* 위쪽 남색 화살표 */
+        .pointer {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            width: 0;
+            height: 0;
+            border-left: 16px solid transparent;
+            border-right: 16px solid transparent;
+            border-top: 30px solid var(--navy);
+            filter: drop-shadow(0 3px 3px rgba(0,0,0,0.25));
+            pointer-events: none;
+        }
+        #rouletteCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #fff;
+            display: block;
+        }
+
+        /* 카운트다운 오버레이 */
+        .countdown {
+            position: absolute;
+            inset: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(21, 42, 82, 0.35);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+        }
+        .countdown span {
+            font-size: clamp(72px, 22vw, 128px);
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 6px 20px rgba(0,0,0,0.35);
+        }
+        .hidden { display: none !important; }
+
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.8) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .zoom-in { animation: zoomIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+
+        /* 룰렛 시작 버튼 */
+        .btn-spin {
+            margin-top: 36px;
+            width: 100%;
+            max-width: 320px;
+            padding: 16px 0;
+            background: var(--navy);
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            font-size: 22px;
+            font-weight: 900;
+            box-shadow: 0 7px 0 var(--navy-dark);
+            transition: transform 0.1s, box-shadow 0.1s, background 0.2s;
+        }
+        .btn-spin:hover:not(:disabled) { transform: translateY(3px); box-shadow: 0 4px 0 var(--navy-dark); }
+        .btn-spin:active:not(:disabled) { transform: translateY(7px); box-shadow: none; }
+
+        /* ==========================================
+           하단: 최근 결과 + 안내 문구
+           ========================================== */
+        .history-section {
+            border-top: 1px solid var(--line);
+            padding: 22px 0;
+        }
+        .history-section h3 {
+            margin: 0 0 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--navy);
+        }
+        .history-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .history-chip {
+            background: #fff;
+            border: 1px solid var(--navy-line);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .history-chip .t { color: #9aa4b2; font-weight: 400; margin-right: 4px; }
+        .history-chip .m { color: var(--navy); }
+        .history-chip .w { color: #9aa4b2; font-weight: 400; }
+        .history-empty { color: #9aa4b2; font-size: 13px; font-weight: 700; }
+
+        .privacy-note {
+            text-align: center;
+            font-size: 11px;
+            color: #9aa4b2;
+            padding: 14px 16px 22px;
+            margin: 0;
+        }
+
+        /* ==========================================
+           결과 팝업
+           ========================================== */
+        .modal {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            background: rgba(15, 28, 54, 0.55);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .modal.show { opacity: 1; }
+        .modal-content {
+            background: #fff;
+            border-radius: 24px;
+            padding: 32px 24px 24px;
+            width: 100%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+            border-top: 6px solid var(--navy);
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        .modal.show .modal-content { transform: scale(1); }
+        .modal-label { margin: 0 0 8px; font-size: 18px; font-weight: 700; color: var(--muted); }
+        .result-name {
+            margin: 0 0 8px;
+            font-size: 42px;
+            font-weight: 900;
+            color: var(--navy);
+            word-break: keep-all;
+            line-height: 1.25;
+        }
+        .result-name .ico { font-size: 28px; vertical-align: middle; margin-right: 4px; }
+        .result-context {
+            margin: 0 0 26px;
+            min-height: 20px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--muted);
+        }
+        .modal-btns { display: flex; gap: 10px; }
+        .modal-btns button { flex: 1; padding: 13px 0; border-radius: 12px; font-size: 15px; font-weight: 700; }
+        .btn-light { background: #f1f4f8; color: var(--text); border: none; }
+        .btn-light:hover { background: #e4e9f0; }
+
+        /* 폭죽 캔버스 */
+        #confettiCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 55;
+        }
+
+        /* ==========================================
+           휴대폰 화면 보정
+           ========================================== */
+        @media (max-width: 600px) {
+            .title { width: 100%; text-align: center; }
+            .title h1 { font-size: 25px; }
+            .weather-card { max-width: none; padding: 12px; gap: 10px; }
+            .toggle-box { padding-left: 10px; }
+            .card { padding: 18px; }
+            .btn-spin { font-size: 20px; margin-top: 30px; }
+            .result-name { font-size: 34px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 맨 위 왼쪽: 업무 도구 모음으로 돌아가기 -->
+    <div class="wrap topbar">
+        <a href="index.html" class="back-link">← 업무 도구 모음</a>
+    </div>
+
+    <!-- 헤더: 제목 & 날씨 카드 -->
+    <header class="wrap header">
+        <div class="title">
+            <h1>오늘 점심 뭐 먹지? 🎯</h1>
+            <p>날씨를 반영하는 스마트 룰렛</p>
+        </div>
+
+        <div class="weather-card">
+            <div class="weather-info">
+                <div class="weather-top">
+                    <!-- 지역 선택 (옵션은 JS에서 생성) -->
+                    <select id="regionSelect" class="region-select" aria-label="지역 선택"></select>
+                    <button id="btnRefreshWeather" class="icon-btn" title="날씨 새로고침" aria-label="날씨 새로고침">🔄</button>
+                </div>
+
+                <!-- 날씨 로딩 / 결과 표시 -->
+                <div id="weatherDisplay" class="weather-display">
+                    <div class="loader"></div>
+                    <span class="weather-loading">날씨 불러오는 중...</span>
+                </div>
+
+                <!-- 현재 적용 중인 확률 규칙 한줄 요약 -->
+                <p id="weatherRuleDesc" class="rule-desc"></p>
+            </div>
+
+            <!-- 날씨 반영 토글 -->
+            <div class="toggle-box">
+                <span>날씨 반영</span>
+                <label class="switch">
+                    <input type="checkbox" id="weatherToggle" checked aria-label="날씨 반영">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인: 메뉴 등록 & 룰렛 -->
+    <main class="wrap main">
+
+        <!-- 왼쪽: 메뉴 등록 -->
+        <section class="card">
+            <div class="panel-head">
+                <h2>메뉴 등록</h2>
+                <span id="menuCount" class="badge">현재 6 / 10개</span>
+            </div>
+
+            <!-- 음식 종류 선택 -->
+            <div class="segment">
+                <label>
+                    <input type="radio" name="foodType" value="any" checked>
+                    <div class="seg-item">🍽️ 상관없음</div>
+                </label>
+                <label>
+                    <input type="radio" name="foodType" value="hot">
+                    <div class="seg-item">🔥 따뜻한</div>
+                </label>
+                <label>
+                    <input type="radio" name="foodType" value="cold">
+                    <div class="seg-item">🧊 시원한</div>
+                </label>
+            </div>
+
+            <!-- 메뉴 이름 입력 -->
+            <div class="input-row">
+                <input type="text" id="menuInput" class="menu-input" maxlength="15" placeholder="메뉴 이름" aria-label="메뉴 이름">
+                <button id="btnAdd" class="btn-primary">추가</button>
+            </div>
+
+            <!-- 안내 메시지 -->
+            <p id="inputMessage" class="input-msg"></p>
+
+            <!-- 메뉴 목록 -->
+            <ul id="menuList" class="menu-list"></ul>
+
+            <!-- 전체 삭제 -->
+            <button id="btnClearAll" class="btn-ghost">전체 삭제</button>
+        </section>
+
+        <!-- 오른쪽: 룰렛 -->
+        <section class="roulette-area">
+            <div class="roulette-box">
+                <div class="pointer"></div>
+
+                <!-- 카운트다운 오버레이 -->
+                <div id="countdownOverlay" class="countdown hidden">
+                    <span id="countdownText">5</span>
+                </div>
+
+                <canvas id="rouletteCanvas"></canvas>
+            </div>
+
+            <button id="btnSpin" class="btn-spin">룰렛 시작!</button>
+        </section>
+    </main>
+
+    <!-- 하단: 최근 결과 -->
+    <footer>
+        <div class="wrap history-section">
+            <h3>🕒 최근 결과</h3>
+            <div id="historyList" class="history-list">
+                <span class="history-empty">아직 기록이 없습니다.</span>
+            </div>
+        </div>
+        <!-- 맨 아래 안내 문구 -->
+        <p class="privacy-note">입력한 내용은 이 브라우저 안에서만 처리되며 어디에도 저장·전송되지 않습니다.</p>
+    </footer>
+
+    <!-- 결과 팝업 -->
+    <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-content">
+            <h3 class="modal-label">오늘 점심은</h3>
+            <p id="resultMenuName" class="result-name">김치찌개!</p>
+            <p id="resultWeatherContext" class="result-context"></p>
+            <div class="modal-btns">
+                <button id="btnModalClose" class="btn-light">닫기</button>
+                <button id="btnModalSpinAgain" class="btn-primary">다시 돌리기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 폭죽 캔버스 -->
+    <canvas id="confettiCanvas"></canvas>
+
+    <script>
+        // ==========================================
+        // 1. 설정 및 상태 변수
+        // ==========================================
+
+        // 지역 목록 (위도·경도 기준, 원하는 지역 추가 가능)
+        const REGIONS = [
+            { name: "서울", lat: 37.5665, lon: 126.9780 },
+            { name: "나주", lat: 35.0160, lon: 126.7108 },
+            { name: "대전", lat: 36.3504, lon: 127.3845 }
+        ];
+
+        // 메뉴 데이터: { name: '이름', type: 'hot'|'cold'|'any' }
+        let menus = [
+            { name: '김치찌개', type: 'hot' },
+            { name: '칼국수', type: 'hot' },
+            { name: '돈가스', type: 'any' },
+            { name: '비빔밥', type: 'any' },
+            { name: '냉면', type: 'cold' },
+            { name: '메밀소바', type: 'cold' }
+        ];
+
+        // 룰렛 색상 (남색 포인트와 어울리는 부드러운 톤)
+        const COLORS = ['#DCE6F5', '#FDE7D8', '#E2F1E6', '#F5E2EC', '#FFF2C6', '#E6E1F5', '#D3ECF2', '#F8DEDB', '#C9D7EE', '#E8F2D6'];
+        // 폭죽 색상 (남색 + 룰렛 색)
+        const CONFETTI_COLORS = ['#1f3a6d', '#3f63a8', '#8fa9d6', '#f3b48a', '#9fd1b0', '#f5d36b', '#e89ab9'];
+
+        let history = [];
+        let isSpinning = false;
+        let currentRotation = 0; // 캔버스 회전 각도 (라디안)
+
+        // 날씨 상태
+        let currentWeather = null;  // null이면 로딩 중이거나 실패
+        let weatherEmojiStr = "❓";
+        let weatherRuleMessage = ""; // 결과 팝업에 보여줄 규칙 문구
+        let weatherRequestId = 0;    // 지역을 빠르게 바꿀 때 이전 응답 무시용
+
+        // ==========================================
+        // 2. DOM 요소
+        // ==========================================
+        const regionSelect = document.getElementById('regionSelect');
+        const btnRefreshWeather = document.getElementById('btnRefreshWeather');
+        const weatherDisplay = document.getElementById('weatherDisplay');
+        const weatherRuleDesc = document.getElementById('weatherRuleDesc');
+        const weatherToggle = document.getElementById('weatherToggle');
+
+        const menuInput = document.getElementById('menuInput');
+        const btnAdd = document.getElementById('btnAdd');
+        const inputMessage = document.getElementById('inputMessage');
+        const menuList = document.getElementById('menuList');
+        const menuCount = document.getElementById('menuCount');
+        const btnClearAll = document.getElementById('btnClearAll');
+
+        const canvas = document.getElementById('rouletteCanvas');
+        const ctx = canvas.getContext('2d');
+        const btnSpin = document.getElementById('btnSpin');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownText = document.getElementById('countdownText');
+
+        const historyList = document.getElementById('historyList');
+        const resultModal = document.getElementById('resultModal');
+        const resultMenuName = document.getElementById('resultMenuName');
+        const resultWeatherContext = document.getElementById('resultWeatherContext');
+        const btnModalClose = document.getElementById('btnModalClose');
+        const btnModalSpinAgain = document.getElementById('btnModalSpinAgain');
+
+        // ==========================================
+        // 3. 날씨 처리 (Open-Meteo 공개 API, 인증키 불필요)
+        //    - 서버로는 선택한 지역의 위도·경도만 보냄
+        //    - 사용자가 입력한 메뉴는 전송하지 않음
+        // ==========================================
+
+        function initRegions() {
+            REGIONS.forEach((r, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                opt.textContent = r.name;
+                regionSelect.appendChild(opt);
+            });
+            regionSelect.addEventListener('change', fetchWeather);
+            btnRefreshWeather.addEventListener('click', fetchWeather);
+            weatherToggle.addEventListener('change', updateWeatherRuleDesc);
+        }
+
+        // Open-Meteo 날씨 코드를 기존 화면에서 쓰던 '하늘' / '강수형태' 값으로 변환
+        function convertWeatherCode(code) {
+            let 하늘 = '흐림';
+            let 강수형태 = '없음';
+
+            if (code === 0 || code === 1) 하늘 = '맑음';
+            else if (code === 2) 하늘 = '구름많음';
+            else 하늘 = '흐림'; // 3(흐림), 45·48(안개) 및 강수 시
+
+            if (code >= 51 && code <= 57) 강수형태 = '빗방울';        // 이슬비
+            else if (code >= 61 && code <= 67) 강수형태 = '비';        // 비 (어는 비 포함)
+            else if (code >= 71 && code <= 77) 강수형태 = '눈';        // 눈
+            else if (code >= 80 && code <= 82) 강수형태 = '소나기';    // 소나기
+            else if (code === 85 || code === 86) 강수형태 = '눈';      // 소낙눈
+            else if (code >= 95) 강수형태 = '비';                      // 뇌우
+
+            return { 하늘, 강수형태 };
+        }
+
+        // 날씨 이모지 결정
+        function getEmoji(sky, pty) {
+            if (pty === '비' || pty === '빗방울' || pty === '소나기') return '🌧️';
+            if (pty === '눈' || pty === '눈날림') return '❄️';
+            if (pty === '비/눈' || pty === '빗방울눈날림') return '🌨️';
+            if (sky === '맑음') return '☀️';
+            if (sky === '구름많음') return '⛅';
+            if (sky === '흐림') return '☁️';
+            return '🌥️';
+        }
+
+        // 날씨 실패 시 화면 처리
+        function showWeatherError(text, ruleText) {
+            currentWeather = null;
+            weatherDisplay.innerHTML = '';
+            const span = document.createElement('span');
+            span.className = 'weather-error';
+            span.textContent = text;
+            weatherDisplay.appendChild(span);
+            weatherRuleDesc.textContent = ruleText;
+            weatherRuleDesc.className = 'rule-desc muted';
+        }
+
+        async function fetchWeather() {
+            // 로딩 상태 표시
+            weatherDisplay.innerHTML = '<div class="loader"></div><span class="weather-loading">날씨 불러오는 중...</span>';
+            weatherRuleDesc.textContent = '';
+            weatherRuleDesc.className = 'rule-desc';
+            currentWeather = null;
+
+            const myId = ++weatherRequestId;
+            const region = REGIONS[regionSelect.value];
+            const url = 'https://api.open-meteo.com/v1/forecast'
+                + `?latitude=${region.lat}&longitude=${region.lon}`
+                + '&current=temperature_2m,weather_code&timezone=Asia%2FSeoul';
+
+            // 10초 넘게 응답이 없으면 중단
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+
+            try {
+                const resp = await fetch(url, { signal: controller.signal });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                if (myId !== weatherRequestId) return; // 더 최근 요청이 있으면 무시
+
+                const cur = data.current;
+                if (!cur || typeof cur.temperature_2m !== 'number') throw new Error('날씨 데이터 형식 오류');
+
+                const { 하늘, 강수형태 } = convertWeatherCode(cur.weather_code);
+                const res = {
+                    ok: true,
+                    기온: Math.round(cur.temperature_2m * 10) / 10,
+                    하늘: 하늘,
+                    강수형태: 강수형태,
+                    예보시각: (cur.time || '').slice(11, 16) // "HH:MM"
+                };
+
+                currentWeather = res;
+                weatherEmojiStr = getEmoji(res.하늘, res.강수형태);
+
+                weatherDisplay.innerHTML = `
+                    <span class="weather-emoji">${weatherEmojiStr}</span>
+                    <div>
+                        <span class="weather-main">${res.기온}℃</span>
+                        <span class="weather-sub">${res.하늘} (${res.강수형태})</span>
+                        <span class="weather-time">${res.예보시각} 기준</span>
+                    </div>
+                `;
+                updateWeatherRuleDesc();
+            } catch (err) {
+                if (myId !== weatherRequestId) return;
+                console.error('날씨 조회 오류:', err);
+                if (err.name === 'AbortError' || err instanceof TypeError) {
+                    showWeatherError('날씨 서버 연결 실패', '날씨 없이 룰렛을 돌립니다.');
+                } else {
+                    showWeatherError('날씨 정보를 불러오지 못했어요.', '날씨 없이 일반 확률로 동작합니다.');
+                }
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        // 현재 날씨에 따라 적용되는 확률 규칙 문구 갱신
+        function updateWeatherRuleDesc() {
+            weatherRuleDesc.className = 'rule-desc';
+
+            if (!weatherToggle.checked) {
+                weatherRuleDesc.textContent = '날씨 반영 스위치가 꺼져있어요. (모든 확률 동일)';
+                weatherRuleMessage = '';
+                return;
+            }
+
+            if (!currentWeather) {
+                // 아직 불러오는 중이거나 실패한 경우
+                if (weatherDisplay.querySelector('.weather-error')) {
+                    weatherRuleDesc.textContent = '날씨 없이 일반 확률로 동작합니다.';
+                    weatherRuleDesc.className = 'rule-desc muted';
+                }
+                weatherRuleMessage = '';
+                return;
+            }
+
+            const { 강수형태, 기온 } = currentWeather;
+            const isRainyOrCold = (강수형태 !== '없음' || 기온 <= 10);
+            const isHotWeather = (기온 >= 28);
+
+            if (isRainyOrCold) {
+                const msg = 강수형태 !== '없음' ? '비/눈 오는 날엔 따끈한 국물!' : '쌀쌀한 날씨엔 따끈한 국물!';
+                weatherRuleDesc.textContent = `${msg} 🔥 메뉴 확률 2배`;
+                weatherRuleMessage = msg + ' 🔥';
+            } else if (isHotWeather) {
+                weatherRuleDesc.textContent = '더운 날엔 시원하게! 🧊 메뉴 확률 2배';
+                weatherRuleMessage = '더운 날엔 시원하게! 🧊';
+            } else {
+                weatherRuleDesc.textContent = '산책하기 좋은 날! 모든 메뉴가 같은 확률이에요 🚶';
+                weatherRuleMessage = '산책하기 좋은 날씨예요 🚶';
+                weatherRuleDesc.className = 'rule-desc good';
+            }
+        }
+
+        // ==========================================
+        // 4. 메뉴 관리
+        // ==========================================
+
+        function getTypeIcon(type) {
+            if (type === 'hot') return '🔥';
+            if (type === 'cold') return '🧊';
+            return '🍽️';
+        }
+
+        function renderMenus() {
+            menuList.innerHTML = '';
+
+            if (menus.length === 0) {
+                const li = document.createElement('li');
+                li.className = 'menu-empty';
+                li.textContent = '등록된 메뉴가 없어요';
+                menuList.appendChild(li);
+            }
+
+            menus.forEach((menu, index) => {
+                const li = document.createElement('li');
+                li.className = 'menu-item';
+
+                // 메뉴 이름 (사용자 입력이므로 textContent로 안전하게 표시)
+                const nameWrap = document.createElement('span');
+                nameWrap.className = 'menu-name';
+                const ico = document.createElement('span');
+                ico.className = 'ico';
+                ico.textContent = getTypeIcon(menu.type);
+                const txt = document.createElement('span');
+                txt.className = 'txt';
+                txt.textContent = menu.name;
+                nameWrap.append(ico, txt);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn-del';
+                delBtn.textContent = '✕';
+                delBtn.setAttribute('aria-label', `${menu.name} 삭제`);
+                delBtn.onclick = () => removeMenu(index);
+
+                li.append(nameWrap, delBtn);
+                menuList.appendChild(li);
+            });
+
+            const count = menus.length;
+            menuCount.textContent = `현재 ${count} / 10개`;
+
+            if (count >= 10) {
+                menuInput.disabled = true;
+                btnAdd.disabled = true;
+                menuInput.placeholder = '메뉴가 가득 찼어요!';
+                showMessage('메뉴는 최대 10개까지 입력할 수 있어요');
+            } else {
+                menuInput.disabled = isSpinning;
+                btnAdd.disabled = isSpinning;
+                menuInput.placeholder = '메뉴 이름';
+                if (inputMessage.textContent === '메뉴는 최대 10개까지 입력할 수 있어요') clearMessage();
+            }
+
+            if (!isSpinning) drawRoulette();
+        }
+
+        function showMessage(msg) { inputMessage.textContent = msg; }
+        function clearMessage() { inputMessage.textContent = ''; }
+
+        function addMenu() {
+            if (isSpinning) return;
+
+            const name = menuInput.value.trim();
+            clearMessage();
+
+            if (menus.length >= 10) {
+                showMessage('메뉴는 최대 10개까지 입력할 수 있어요');
+                return;
+            }
+            if (!name) return;
+
+            if (menus.some(m => m.name === name)) {
+                showMessage('이미 있는 메뉴예요');
+                menuInput.focus();
+                return;
+            }
+
+            const selectedType = document.querySelector('input[name="foodType"]:checked').value;
+            menus.push({ name: name, type: selectedType });
+            menuInput.value = '';
+            menuInput.focus();
+            renderMenus();
+        }
+
+        function removeMenu(index) {
+            if (isSpinning) return;
+            menus.splice(index, 1);
+            clearMessage();
+            renderMenus();
+        }
+
+        // 이벤트 연결
+        btnAdd.addEventListener('click', addMenu);
+        menuInput.addEventListener('keydown', (e) => {
+            // 한글 입력 조합 중 엔터는 무시 (중복 추가 방지)
+            if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addMenu(); }
+        });
+        btnClearAll.addEventListener('click', () => {
+            if (isSpinning) return;
+            menus = [];
+            clearMessage();
+            renderMenus();
+        });
+
+        // ==========================================
+        // 5. 룰렛 그리기 및 회전
+        // ==========================================
+
+        function initCanvasSize() {
+            const size = 600;
+            canvas.width = size;
+            canvas.height = size;
+        }
+
+        function drawRoulette() {
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = Math.min(cx, cy) - 10;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const numSegments = menus.length;
+
+            // 메뉴가 없을 때
+            if (numSegments === 0) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = '#f3f5f9';
+                ctx.fill();
+                ctx.strokeStyle = '#dfe5ee';
+                ctx.lineWidth = 10;
+                ctx.stroke();
+                ctx.fillStyle = '#8a97ab';
+                ctx.font = "700 30px 'Noto Sans KR', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('메뉴를 추가해주세요', cx, cy);
+                return;
+            }
+
+            const arc = (2 * Math.PI) / numSegments;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(currentRotation);
+
+            // 부채꼴
+            for (let i = 0; i < numSegments; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, i * arc, (i + 1) * arc);
+                ctx.fillStyle = COLORS[i % COLORS.length];
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+            }
+
+            // 메뉴 이름 + 종류 아이콘
+            for (let i = 0; i < numSegments; i++) {
+                ctx.save();
+                ctx.rotate(i * arc + arc / 2);
+                ctx.fillStyle = '#1f3a6d';
+                const fontSize = numSegments > 7 ? 26 : 34;
+                ctx.font = `900 ${fontSize}px 'Noto Sans KR', sans-serif`;
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = 'rgba(255,255,255,0.8)';
+                ctx.shadowBlur = 4;
+                ctx.fillText(menus[i].name, radius - 40, 0);
+
+                ctx.font = '20px sans-serif';
+                ctx.shadowBlur = 0;
+                ctx.fillText(getTypeIcon(menus[i].type), radius - 15, 0);
+                ctx.restore();
+            }
+
+            // 바깥 테두리
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#1f3a6d';
+            ctx.stroke();
+
+            // 가운데 장식
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#1f3a6d';
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // 회전 중에는 조작 막기
+        function setUIState(disabled) {
+            isSpinning = disabled;
+            menuInput.disabled = disabled || menus.length >= 10;
+            btnAdd.disabled = disabled || menus.length >= 10;
+            btnClearAll.disabled = disabled;
+            btnSpin.disabled = disabled;
+            regionSelect.disabled = disabled;
+            weatherToggle.disabled = disabled;
+            btnRefreshWeather.disabled = disabled;
+        }
+
+        // 당첨 메뉴 선정 (날씨 가중치 랜덤)
+        function getWinnerIndex() {
+            if (!weatherToggle.checked || !currentWeather) {
+                return Math.floor(Math.random() * menus.length); // 균등 확률
+            }
+
+            const { 강수형태, 기온 } = currentWeather;
+            const isRainyOrCold = (강수형태 !== '없음' || 기온 <= 10);
+            const isHotWeather = (기온 >= 28);
+
+            let totalWeight = 0;
+            const weights = menus.map(menu => {
+                let weight = 1;
+                if (isRainyOrCold && menu.type === 'hot') weight = 2;  // 따뜻한 음식 2배
+                if (isHotWeather && menu.type === 'cold') weight = 2;  // 시원한 음식 2배
+                totalWeight += weight;
+                return weight;
+            });
+
+            let random = Math.random() * totalWeight;
+            let sum = 0;
+            for (let i = 0; i < menus.length; i++) {
+                sum += weights[i];
+                if (random < sum) return i;
+            }
+            return menus.length - 1;
+        }
+
+        function spinRoulette() {
+            if (isSpinning) return;
+            if (menus.length < 2) {
+                alert('메뉴를 2개 이상 입력해 주세요');
+                return;
+            }
+
+            setUIState(true);
+
+            // 당첨 번호 미리 결정
+            const winnerIndex = getWinnerIndex();
+            const numSegments = menus.length;
+            const arc = (2 * Math.PI) / numSegments;
+
+            // 화살표(12시 방향 = -π/2)에 당첨 칸이 오도록 목표 각도 계산
+            const winnerCenterAngle = winnerIndex * arc + (arc / 2);
+            const randomOffset = (Math.random() * 0.7 - 0.35) * arc; // 경계선에 걸리지 않는 범위
+            const finalTargetAngle = winnerCenterAngle + randomOffset;
+            const targetBase = -Math.PI / 2 - finalTargetAngle;
+
+            let currentMod = currentRotation % (2 * Math.PI);
+            if (currentMod < 0) currentMod += 2 * Math.PI;
+            let targetMod = targetBase % (2 * Math.PI);
+            if (targetMod < 0) targetMod += 2 * Math.PI;
+
+            let deltaRotation = targetMod - currentMod;
+            if (deltaRotation <= 0) deltaRotation += 2 * Math.PI;
+            deltaRotation += 10 * 2 * Math.PI; // 10바퀴 추가 회전
+
+            const startRotation = currentRotation;
+            const duration = 5000; // 5초
+            let startTime = null;
+            let lastSec = 5;
+
+            countdownOverlay.classList.remove('hidden');
+            countdownText.textContent = '5';
+
+            function easeOutQuart(t) { return 1 - Math.pow(1 - t, 4); }
+
+            function animate(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsed = timestamp - startTime;
+                let t = Math.min(elapsed / duration, 1);
+
+                currentRotation = startRotation + deltaRotation * easeOutQuart(t);
+                drawRoulette();
+
+                // 카운트다운 숫자 갱신
+                const sec = Math.ceil((duration - elapsed) / 1000);
+                if (sec > 0 && sec !== lastSec) {
+                    lastSec = sec;
+                    countdownText.textContent = sec;
+                    countdownText.classList.remove('zoom-in');
+                    void countdownText.offsetWidth; // 애니메이션 재시작용 리플로우
+                    countdownText.classList.add('zoom-in');
+                }
+
+                if (t < 1) requestAnimationFrame(animate);
+                else finishSpin(winnerIndex);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // ==========================================
+        // 6. 결과 처리 및 폭죽
+        // ==========================================
+
+        function finishSpin(winnerIndex) {
+            setUIState(false);
+            countdownOverlay.classList.add('hidden');
+
+            const winner = menus[winnerIndex];
+            addHistory(winner.name);
+            showResultModal(winner);
+            fireConfetti();
+        }
+
+        function addHistory(menuName) {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+            let weatherStr = '';
+            if (currentWeather && weatherToggle.checked) {
+                weatherStr = `(${weatherEmojiStr} ${currentWeather.기온}℃)`;
+            }
+
+            history.unshift({ time: timeStr, menu: menuName, weatherInfo: weatherStr });
+            if (history.length > 5) history.pop();
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (history.length === 0) return;
+            historyList.innerHTML = '';
+            history.forEach(item => {
+                const chip = document.createElement('div');
+                chip.className = 'history-chip fade-in';
+
+                const t = document.createElement('span');
+                t.className = 't';
+                t.textContent = item.time;
+                const m = document.createElement('span');
+                m.className = 'm';
+                m.textContent = item.menu;
+                chip.append(t, m);
+
+                if (item.weatherInfo) {
+                    const w = document.createElement('span');
+                    w.className = 'w';
+                    w.textContent = ' ' + item.weatherInfo;
+                    chip.appendChild(w);
+                }
+                historyList.appendChild(chip);
+            });
+        }
+
+        function showResultModal(winner) {
+            resultMenuName.innerHTML = '';
+            const ico = document.createElement('span');
+            ico.className = 'ico';
+            ico.textContent = getTypeIcon(winner.type);
+            resultMenuName.append(ico, document.createTextNode(winner.name));
+
+            if (weatherToggle.checked && weatherRuleMessage) {
+                resultWeatherContext.textContent = weatherRuleMessage;
+            } else {
+                resultWeatherContext.textContent = '';
+            }
+
+            resultModal.classList.remove('hidden');
+            setTimeout(() => resultModal.classList.add('show'), 10);
+        }
+
+        function closeResultModal() {
+            resultModal.classList.remove('show');
+            setTimeout(() => resultModal.classList.add('hidden'), 300);
+        }
+
+        btnModalClose.addEventListener('click', closeResultModal);
+        btnModalSpinAgain.addEventListener('click', () => {
+            closeResultModal();
+            setTimeout(spinRoulette, 300);
+        });
+        // 팝업 바깥을 누르면 닫기
+        resultModal.addEventListener('click', (e) => {
+            if (e.target === resultModal) closeResultModal();
+        });
+        btnSpin.addEventListener('click', spinRoulette);
+
+        // --- 폭죽 효과 (라이브러리 없이 직접 구현) ---
+        const cCanvas = document.getElementById('confettiCanvas');
+        const cCtx = cCanvas.getContext('2d');
+        let particles = [];
+        let confettiRaf = null;
+
+        function resizeConfetti() {
+            cCanvas.width = window.innerWidth;
+            cCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfetti);
+        resizeConfetti();
+
+        class Confetti {
+            constructor() {
+                this.x = cCanvas.width / 2;
+                this.y = cCanvas.height * 0.3;
+                const angle = Math.random() * Math.PI * 2;
+                const vel = Math.random() * 20 + 5;
+                this.vx = Math.cos(angle) * vel;
+                this.vy = Math.sin(angle) * vel - 12; // 위로 터지도록
+                this.color = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+                this.size = Math.random() * 10 + 5;
+                this.rotation = Math.random() * 360;
+                this.rSpeed = (Math.random() - 0.5) * 10;
+                this.drag = 0.98;
+            }
+            update() {
+                this.vx *= this.drag;
+                this.vy *= this.drag;
+                this.vy += 0.5; // 중력
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rotation += this.rSpeed;
+            }
+            draw() {
+                cCtx.save();
+                cCtx.translate(this.x, this.y);
+                cCtx.rotate(this.rotation * Math.PI / 180);
+                cCtx.fillStyle = this.color;
+                cCtx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size * 0.6);
+                cCtx.restore();
+            }
+        }
+
+        function fireConfetti() {
+            if (confettiRaf) cancelAnimationFrame(confettiRaf);
+            particles = [];
+            for (let i = 0; i < 150; i++) particles.push(new Confetti());
+
+            function animateConfetti() {
+                cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+                let active = false;
+                for (const p of particles) {
+                    p.update();
+                    p.draw();
+                    if (p.y < cCanvas.height) active = true;
+                }
+                if (active) {
+                    confettiRaf = requestAnimationFrame(animateConfetti);
+                } else {
+                    cCtx.clearRect(0, 0, cCanvas.width, cCanvas.height);
+                    confettiRaf = null;
+                }
+            }
+            animateConfetti();
+        }
+
+        // ==========================================
+        // 7. 초기 실행
+        // ==========================================
+        initRegions();
+        initCanvasSize();
+        renderMenus();
+        fetchWeather(); // 접속 시 날씨 1회 조회
+
+        // 글꼴이 늦게 로드되면 룰렛 글자를 다시 그림
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => { if (!isSpinning) drawRoulette(); });
+        }
+    </script>
+</body>
+</html>
